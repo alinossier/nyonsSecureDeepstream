@@ -48,6 +48,16 @@ extern "C"
 #include "deepstream_c2d_msg.h"
 #include "deepstream_image_save.h"
 
+
+typedef struct
+{
+  GstElement *bin;
+  GstElement *queue;
+  GstElement *nvvidconv;
+  GstElement *nvdsosd;
+} NvDsGieBin;
+
+
 typedef struct _AppCtx AppCtx;
 
 typedef void (*bbox_generated_callback) (AppCtx *appCtx, GstBuffer *buf,
@@ -87,6 +97,7 @@ typedef struct
   NvDsInstanceBin common_elements;
   GstElement *tiler_tee;
   NvDsTiledDisplayBin tiled_display_bin;
+  NvDsGieBin primary_gie_bin;
   GstElement *demuxer;
   NvDsDsExampleBin dsexample_bin;
   AppCtx *appCtx;

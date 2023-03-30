@@ -16,7 +16,15 @@ uri=rtsp://deepstream:deepstream@192.168.1.252:554/h264Preview_01_main
 num-sources=1
 gpu-id=0
 
+[source2]
+enable=1
+type=4
+uri=rtsp://deepstream:deepstream@192.168.1.251:554/h264Preview_01_main
+num-sources=1
+gpu-id=0
+
 [sink0]
+source-id=0
 enable=1
 type=4
 codec=1
@@ -25,6 +33,27 @@ bitrate=1000000
 rtsp-port=8554
 udp-port=5400
 gpu-id=0
+width=1280
+height=720
+
+
+[sink1]
+enable=1
+# Set the sink type to filesink (3)
+type=3
+# Set the output file path
+output-file=out.mp4
+# Set the container format to qtmux for MP4
+container=1
+# Set the codec to H.264
+codec=1
+# Set the encoding bit rate (you can adjust this value)
+bitrate=4000000
+# Set the output resolution (you can adjust these values)
+width=1280
+height=720
+# Set the source ID to connect this sink to the tiler
+source-id=0
 
 [osd]
 enable=1
@@ -38,7 +67,7 @@ font=Serif
 [streammux]
 gpu-id=0
 live-source=1
-batch-size=1
+batch-size=3
 batched-push-timeout=40000
 width=640
 height=480
@@ -54,7 +83,17 @@ enable-batch-process=1
 [class-attrs-all]
 threshold=0.8
 
+[tiled-display]
+enable=1
+rows=2
+columns=2
+width=1280
+height=720
+gpu-id=0
+nvbuf-memory-type=0
+
 [primary-gie]
 enable=1
 gpu-id=0
 config-file=/opt/nvidia/deepstream/deepstream-5.0/samples/configs/tlt_pretrained_models/config_infer_primary_peoplenet.txt
+

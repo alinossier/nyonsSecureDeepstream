@@ -19,6 +19,15 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#define _XOPEN_SOURCE 500
+#include <features.h>
+
+#include <stdio.h>
+#include <limits.h>
+
+#define _GNU_SOURCE
+#include <stdlib.h>
+
 
 #include <gst/gst.h>
 #include <glib.h>
@@ -35,12 +44,18 @@
 #include <sys/inotify.h>
 
 #include <time.h>
+#include <gst/gst.h>
+
+
 #include <unistd.h>
 #include <errno.h>
 
 #include "deepstream_app.h"
 #include "deepstream_config_file_parser.h"
 #include "nvds_version.h"
+// #include "deepstream_smart_record.h"
+// #include <gst/rtsp-server/rtsp-server.h>
+
 
 #include <termios.h>
 #include <X11/Xlib.h>
@@ -264,6 +279,7 @@ generate_ts_rfc3339 (char *buf, int buf_size)
   g_snprintf (strmsec, sizeof (strmsec), ".%.3dZ", ms);
   strncat (buf, strmsec, buf_size);
 }
+
 
 static GstClockTime
 generate_ts_rfc3339_from_ts (char *buf, int buf_size, GstClockTime ts,
@@ -587,6 +603,24 @@ bbox_generated_probe_after_analytics (AppCtx * appCtx, GstBuffer * buf,
   NvDsObjectMeta *obj_meta = NULL;
   GstClockTime buffer_pts = 0;
   guint32 stream_id = 0;
+
+  // Get the class ID and confidence score
+// gint class_id = obj_meta->class_id;
+// gfloat confidence = obj_meta->confidence;
+
+// Check if the class ID corresponds to a person and confidence score is above 80%
+// if (class_id == PERSON_CLASS_ID && confidence > 0.8) {
+//     // Enable smart record
+//     NvDsSRRecordingInfo sr_info = {0};
+//     sr_info.start = TRUE;
+//     sr_info.duration = 10; // Set the desired recording duration in seconds
+
+//     NvDsSRStatus sr_status = {0};
+//     NvDsSRSetRecordingInfo(obj_meta->unique_component_id, &sr_info, &sr_status);
+// }
+
+
+
 
   for (NvDsMetaList * l_frame = batch_meta->frame_meta_list; l_frame != NULL;
       l_frame = l_frame->next) {
@@ -1414,6 +1448,7 @@ main (int argc, char *argv[])
       if (force_tcp)
         appCtx[i]->config.multi_source_config[j].select_rtp_protocol = 0x04;
     }
+    
     if (!create_pipeline (appCtx[i], bbox_generated_probe_after_analytics,
             NULL, perf_cb, overlay_graphics)) {
       NVGSTDS_ERR_MSG_V ("Failed to create pipeline");

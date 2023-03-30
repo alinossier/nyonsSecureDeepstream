@@ -1,18 +1,67 @@
-CC := gcc
+################################################################################
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a
+# copy of this software and associated documentation files (the "Software"),
+# to deal in the Software without restriction, including without limitation
+# the rights to use, copy, modify, merge, publish, distribute, sublicense,
+# and/or sell copies of the Software, and to permit persons to whom the
+# Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+################################################################################
 
-APP := deepstream-test5-app
+APP:= nyons-secure-deepstream-app
 
-CFLAGS := -std=c99 -Wall -Werror -I/opt/nvidia/deepstream/deepstream-5.0/sources/apps/sample_apps/deepstream-app -I/opt/nvidia/deepstream/deepstream-5.0/sources/includes/ -I/usr/include/gstreamer-1.0 -I/usr/include/glib-2.0 -I/usr/lib/aarch64-linux-gnu/glib-2.0/include -I/opt/nvidia/deepstream/deepstream-5.0/sources/apps/apps-common/includes
+TARGET_DEVICE = $(shell gcc -dumpmachine | cut -f1 -d -)
 
-LDFLAGS := -L/opt/nvidia/deepstream/deepstream-5.0/lib -L/usr/local/cuda/lib64 -lcudart -Wl,-rpath=/opt/nvidia/deepstream/deepstream-5.0/lib -ldeepstream -lopnvds_meta -lnvdsgst_meta -ldeepracin -lnvds_meta -lnvds_msgbroker
+NVDS_VERSION:=5.0
 
-SRCS := deepstream_test5_app_main.c
+LIB_INSTALL_DIR?=/opt/nvidia/deepstream/deepstream-$(NVDS_VERSION)/lib/
+APP_INSTALL_DIR?=/opt/nvidia/deepstream/deepstream-$(NVDS_VERSION)/bin/
+
+ifeq ($(TARGET_DEVICE),aarch64)
+  CFLAGS:= -DPLATFORM_TEGRA
+endif
+
+SRCS:= deepstream_test5_app_main.c deepstream_utc.c deepstream_app.c deepstream_app_config_parser.c
+SRCS+= $(wildcard ../../apps-common/src/*.c)
+
+INCS:= $(wildcard *.h)
+
+PKGS:= gstreamer-1.0 gstreamer-video-1.0 x11 json-glib-1.0
+
+OBJS:= $(SRCS:.c=.o)
+
+CFLAGS+= -I../../apps-common/includes -I../../../includes -DDS_VERSION_MINOR=0 -DDS_VERSION_MAJOR=5 -D_POSIX_C_SOURCE=199309L
+
+LIBS+= -L$(LIB_INSTALL_DIR) -lnvdsgst_meta -lnvds_meta -lnvdsgst_helper -lnvdsgst_smartrecord -lnvds_utils -lnvds_msgbroker -lm \
+       -lgstrtspserver-1.0 -ldl -Wl,-rpath,$(LIB_INSTALL_DIR)
+
+CFLAGS+= `pkg-config --cflags $(PKGS)`
+
+LIBS+= `pkg-config --libs $(PKGS)`
 
 all: $(APP)
 
-$(APP): $(SRCS)
-	$(CC) -o $(APP) $(SRCS) $(CFLAGS) $(LDFLAGS)
+%.o: %.c $(INCS) Makefile
+	$(CC) -c -o $@ $(CFLAGS) $<
+
+$(APP): $(OBJS) Makefile
+	$(CC) -o $(APP) $(OBJS) $(LIBS)
+
+install: $(APP)
+	cp -rv $(APP) $(APP_INSTALL_DIR)
 
 clean:
-	rm -rf $(APP)
+	rm -rf $(OBJS) $(APP)
 

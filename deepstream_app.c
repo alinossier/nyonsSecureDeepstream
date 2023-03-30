@@ -24,6 +24,8 @@
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
+#include <sys/time.h>
+
 
 #include "deepstream_app.h"
 
@@ -62,6 +64,56 @@ static gboolean add_and_link_broker_sink (AppCtx * appCtx);
  *         group is searched for
  */
 static gboolean is_sink_available_for_source_id(NvDsConfig *config, guint source_id);
+
+
+static GstPadProbeReturn
+pgie_src_pad_buffer_probe (GstPad * pad, GstPadProbeInfo * info, gpointer u_data)
+{
+    GstBuffer *buf = (GstBuffer *) info->data;
+    NvDsBatchMeta *batch_meta = gst_buffer_get_nvds_batch_meta (buf);
+    NvDsMetaList *l_frame = NULL;
+
+    for (l_frame = batch_meta->frame_meta_list; l_frame != NULL;
+         l_frame = l_frame->next) {
+        NvDsFrameMeta *frame_meta = (NvDsFrameMeta *) (l_frame->data);
+        NvDsMetaList *l_obj = NULL;
+
+        for (l_obj = frame_meta->obj_meta_list; l_obj != NULL;
+             l_obj = l_obj->next) {
+            NvDsObjectMeta *obj = (NvDsObjectMeta *) (l_obj->data);
+
+            // Check if the object is a person and confidence score is above 80%
+            if (obj->class_id == 2 && obj->confidence > 0.8) {
+                // Enable smart record, capture frame, and send Kafka message here
+
+                // Add object class name and confidence score as a display text
+                NvDsDisplayMeta *display_meta = nvds_acquire_display_meta_from_pool(batch_meta);
+                NvOSD_TextParams *txt_params = &display_meta->text_params[0];
+
+                display_meta->num_labels = 1;
+                txt_params->display_text = g_strdup_printf("Person (%.2f)", obj->confidence * 100);
+                txt_params->x_offset = obj->rect_params.left;
+                txt_params->y_offset = MAX(0, obj->rect_params.top - 20);
+                txt_params->font_params.font_name = (char *)"Serif";
+                txt_params->font_params.font_size = 15;
+                txt_params->font_params.font_color.red = 1.0;
+                txt_params->font_params.font_color.green = 1.0;
+                txt_params->font_params.font_color.blue = 1.0;
+                txt_params->font_params.font_color.alpha = 1.0;
+                txt_params->set_bg_clr = 1;
+                txt_params->text_bg_clr.red = 0.3;
+                txt_params->text_bg_clr.green = 0.3;
+                txt_params->text_bg_clr.blue = 0.3;
+                txt_params->text_bg_clr.alpha = 1.0;
+
+                nvds_add_display_meta_to_frame(frame_meta, display_meta);
+            }
+        }
+    }
+
+    return GST_PAD_PROBE_OK;
+}
+
 
 /**
  * callback function to receive messages from components
@@ -275,12 +327,12 @@ write_kitti_past_track_output (AppCtx * appCtx, NvDsBatchMeta * batch_meta)
       user_meta = (NvDsUserMeta *)bmeta_list->data;
       if(user_meta && user_meta->base_meta.meta_type==NVDS_TRACKER_PAST_FRAME_META){
         pPastFrameObjBatch = (NvDsPastFrameObjBatch *) (user_meta->user_meta_data);
-        for (uint si=0; si < pPastFrameObjBatch->numFilled; si++){
+        for (guint si=0; si < pPastFrameObjBatch->numFilled; si++){
           NvDsPastFrameObjStream *objStream = (pPastFrameObjBatch->list) + si;
           guint stream_id = (guint)(objStream->streamID);
-          for (uint li=0; li<objStream->numFilled; li++){
+          for (guint li=0; li<objStream->numFilled; li++){
             NvDsPastFrameObjList *objList = (objStream->list) + li;
-            for (uint oi=0; oi<objList->numObj; oi++) {
+            for (guint oi=0; oi<objList->numObj; oi++) {
               NvDsPastFrameObj *obj = (objList->list) + oi;
               g_snprintf (bbox_file, sizeof (bbox_file) - 1,
                 "%s/%02u_%03u_%06lu.txt", appCtx->config.kitti_track_dir_path,
@@ -810,7 +862,7 @@ done:
  * streams. So they are independent of number of streams in the pipeline.
  */
 static gboolean
-create_common_elements (NvDsConfig * config, NvDsPipeline * pipeline,
+create_common_elements (AppCtx * appCtx, NvDsConfig * config, NvDsPipeline * pipeline,
     GstElement ** sink_elem, GstElement ** src_elem,
     bbox_generated_callback bbox_generated_post_analytics_cb)
 {
@@ -884,6 +936,14 @@ create_common_elements (NvDsConfig * config, NvDsPipeline * pipeline,
     }
     gst_bin_add (GST_BIN (pipeline->pipeline),
         pipeline->common_elements.primary_gie_bin.bin);
+
+    GstPad *pgie_src_pad = gst_element_get_static_pad (pipeline->primary_gie_bin.bin, "src");
+    if (!pgie_src_pad)
+      g_print ("Unable to get src pad\n");
+    else
+      gst_pad_add_probe (pgie_src_pad, GST_PAD_PROBE_TYPE_BUFFER,
+          pgie_src_pad_buffer_probe, appCtx, (GDestroyNotify) NULL);
+
     if (*sink_elem) {
       NVGSTDS_LINK_ELEMENT (pipeline->common_elements.primary_gie_bin.bin,
           *sink_elem);
@@ -1254,7 +1314,7 @@ create_pipeline (AppCtx * appCtx,
     last_elem = pipeline->dsexample_bin.bin;
   }
   // create and add common components to pipeline.
-  if (!create_common_elements (config, pipeline, &tmp_elem1, &tmp_elem2,
+  if (!create_common_elements (appCtx, config, pipeline, &tmp_elem1, &tmp_elem2,
           bbox_generated_post_analytics_cb)) {
     goto done;
   }
