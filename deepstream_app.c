@@ -937,7 +937,10 @@ create_common_elements (AppCtx * appCtx, NvDsConfig * config, NvDsPipeline * pip
     gst_bin_add (GST_BIN (pipeline->pipeline),
         pipeline->common_elements.primary_gie_bin.bin);
 
+    g_print ("Pipeline primary_gie_bin.bin: %p\n", pipeline->primary_gie_bin.bin);
     GstPad *pgie_src_pad = gst_element_get_static_pad (pipeline->primary_gie_bin.bin, "src");
+    g_print ("pgie_src_pad: %p\n", pgie_src_pad);
+
     if (!pgie_src_pad)
       g_print ("Unable to get src pad\n");
     else
@@ -1053,18 +1056,6 @@ create_pipeline (AppCtx * appCtx,
     NVGSTDS_ERR_MSG_V ("Failed to create pipeline");
     goto done;
   }
-
-  GstElement *nvstreammux = gst_bin_get_by_name (GST_BIN (pipeline), "nvstreammux");
-
-  GstPad *src_pad = gst_element_get_static_pad (nvstreammux, "src");
-  if (!src_pad)
-    g_print ("Unable to find src pad of nvstreammux\n");
-  else {
-    gst_pad_add_probe (src_pad, GST_PAD_PROBE_TYPE_BUFFER,
-                      pgie_src_pad_buffer_probe, NULL, NULL);
-    gst_object_unref (src_pad);
-  }
-
 
   bus = gst_pipeline_get_bus (GST_PIPELINE (pipeline->pipeline));
   pipeline->bus_id = gst_bus_add_watch (bus, bus_callback, appCtx);
