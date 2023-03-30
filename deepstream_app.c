@@ -82,8 +82,11 @@ pgie_src_pad_buffer_probe (GstPad * pad, GstPadProbeInfo * info, gpointer u_data
              l_obj = l_obj->next) {
             NvDsObjectMeta *obj = (NvDsObjectMeta *) (l_obj->data);
 
+            g_print("Detection class: %d\n", obj->class_id);
+            g_print("Detection confidence: %f\n", obj->confidence);
+
             // Check if the object is a person and confidence score is above 80%
-            if (obj->class_id == 2 && obj->confidence > 0.8) {
+            if (obj->class_id == 0 && obj->confidence > 0.5) {
                 // Enable smart record, capture frame, and send Kafka message here
 
                 // Add object class name and confidence score as a display text
@@ -937,10 +940,7 @@ create_common_elements (AppCtx * appCtx, NvDsConfig * config, NvDsPipeline * pip
     gst_bin_add (GST_BIN (pipeline->pipeline),
         pipeline->common_elements.primary_gie_bin.bin);
 
-    g_print ("Pipeline primary_gie_bin.bin: %p\n", pipeline->primary_gie_bin.bin);
-    GstPad *pgie_src_pad = gst_element_get_static_pad (pipeline->primary_gie_bin.bin, "src");
-    g_print ("pgie_src_pad: %p\n", pgie_src_pad);
-
+    GstPad *pgie_src_pad = gst_element_get_static_pad (pipeline->common_elements.primary_gie_bin.bin, "src");
     if (!pgie_src_pad)
       g_print ("Unable to get src pad\n");
     else
