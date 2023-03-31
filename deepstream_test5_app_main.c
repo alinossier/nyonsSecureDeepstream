@@ -604,29 +604,12 @@ bbox_generated_probe_after_analytics (AppCtx * appCtx, GstBuffer * buf,
   GstClockTime buffer_pts = 0;
   guint32 stream_id = 0;
 
-  // Get the class ID and confidence score
-// gint class_id = obj_meta->class_id;
-// gfloat confidence = obj_meta->confidence;
-
-// Check if the class ID corresponds to a person and confidence score is above 80%
-// if (class_id == PERSON_CLASS_ID && confidence > 0.8) {
-//     // Enable smart record
-//     NvDsSRRecordingInfo sr_info = {0};
-//     sr_info.start = TRUE;
-//     sr_info.duration = 10; // Set the desired recording duration in seconds
-
-//     NvDsSRStatus sr_status = {0};
-//     NvDsSRSetRecordingInfo(obj_meta->unique_component_id, &sr_info, &sr_status);
-// }
-
-
-
-
   for (NvDsMetaList * l_frame = batch_meta->frame_meta_list; l_frame != NULL;
       l_frame = l_frame->next) {
     NvDsFrameMeta *frame_meta = l_frame->data;
     stream_id = frame_meta->source_id;
     GstClockTime buf_ntp_time = 0;
+    
     if (playback_utc == FALSE) {
       /** Calculate the buffer-NTP-time
        * derived from this stream's RTCP Sender Report here:
@@ -648,6 +631,17 @@ bbox_generated_probe_after_analytics (AppCtx * appCtx, GstBuffer * buf,
        * be displayed on top of the bounding box, so lets form it here. */
 
       obj_meta = (NvDsObjectMeta *) (l->data);
+
+      gchar *text;
+      // Add confidence to the bounding box
+      text = g_strdup_printf ("%s, Class: %d, Confidence: %.2f", obj_meta->obj_label, obj_meta->class_id, obj_meta->confidence);
+      NvOSD_TextParams *txt_params = &obj_meta->text_params;
+      txt_params->display_text = g_malloc0 (MAX_DISPLAY_LEN);
+      g_strlcpy (txt_params->display_text, text, MAX_DISPLAY_LEN);
+      txt_params->x_offset = obj_meta->rect_params.left;
+      txt_params->y_offset = obj_meta->rect_params.top - 10;
+
+      g_free (text);
 
       {
         /**
